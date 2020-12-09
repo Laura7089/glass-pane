@@ -1,0 +1,6 @@
+Cargo.lock
+target
+README.md
+LICENSE
+Dockerfile
+.dockerignore

@@ -6,7 +6,15 @@ edition = "2018"
 
 [dependencies]
 prometheus = "0.11.0"
-tokio = "0.3.5"
 rcon = "0.3.1"
-structopt = "0.3.21"
 env_logger = "0.8.2"
+uuid = "0.8.1"
+serde_yaml = "0.8.14"
+
+[dependencies.tokio]
+version = "0.3.5"
+features = ["full"]
+
+[dependencies.serde]
+version = "1.0.118"
+features = ["derive"]

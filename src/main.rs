@@ -4,6 +4,7 @@ use tokio::prelude::*;
 
 mod config;
 mod minecraft;
+mod player;
 
 #[tokio::main]
 async fn main() {
@@ -13,10 +14,16 @@ async fn main() {
     };
 
     let config: config::Configuration = serde_yaml::from_str(
-        &std::fs::read_to_string(&config_file_loc)
-            .unwrap_or_else(|e| panic!("Couldn't read config file at {}, error: {}", config_file_loc, e)),
+        &std::fs::read_to_string(&config_file_loc).unwrap_or_else(|e| {
+            panic!(
+                "Couldn't read config file at {}, error: {}",
+                config_file_loc, e
+            )
+        }),
     )
     .unwrap();
 
-    println!("{:?}", config);
+    for server in config.servers.iter() {
+        println!("{:?}", server.get_player_stats().await);
+    }
 }

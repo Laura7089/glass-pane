@@ -12,12 +12,9 @@ ENV RUST_LOG=info
 
 COPY --from=builder /app/target/release/glass-pane /usr/bin/glass-pane
 
-RUN useradd -s /bin/false -r -u $UID glasspane && \
-    mkdir -p /config && \
-    chown -R glasspane:glasspane /config && \
+RUN useradd -s /bin/false -r -u $UID glass-pane && \
     chmod 0755 /usr/bin/glass-pane
 
-USER glasspane
+USER glass-pane
 EXPOSE 9946
-ENTRYPOINT /usr/bin/glass-pane
-CMD /config/glasspane.yml
+ENTRYPOINT /usr/bin/glass-pane /config.yml

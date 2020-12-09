@@ -3,6 +3,6 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
-    listen_port: u16,
-    servers: Vec<MinecraftServer>,
+    pub listen_port: u16,
+    pub servers: Vec<MinecraftServer>,
 }

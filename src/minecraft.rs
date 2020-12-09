@@ -1,8 +1,9 @@
+use crate::player::{PlayerId, PlayerStats};
 use rcon::Connection;
 use serde::Deserialize;
 use std::error::Error;
-use std::path::PathBuf;
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct MinecraftServer {
@@ -16,7 +17,12 @@ pub struct MinecraftServer {
 
 impl fmt::Debug for MinecraftServer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MinecraftServer").field("name", &self.name).field("rcon_address", &self.rcon_address).field("rcon_password", &self.rcon_password).field("data_path", &self.data_path).finish()
+        f.debug_struct("MinecraftServer")
+            .field("name", &self.name)
+            .field("rcon_address", &self.rcon_address)
+            .field("rcon_password", &self.rcon_password)
+            .field("data_path", &self.data_path)
+            .finish()
     }
 }
 
@@ -46,16 +52,36 @@ impl MinecraftServer {
         Ok(())
     }
 
+    pub fn disconnect(&mut self) {
+        self.connection = None;
+    }
+
     pub async fn command(&mut self, cmd: &str) -> Result<String, Box<dyn Error>> {
         Ok(self
             .connection
             .as_mut()
-            .expect("Tried to run a command on a server without a connection")
+            .ok_or("Tried to run a command on a server without a connection".to_string())?
             .cmd(cmd)
             .await?)
     }
 
-    pub fn is_initialised(&self) -> bool {
+    pub fn is_connected(&self) -> bool {
         self.connection.is_some()
+    }
+
+    pub async fn whitelist(&mut self) -> Result<Vec<PlayerId>, Box<dyn Error>> {
+        let server_response = self.command("whitelist list").await?;
+        unimplemented!()
+    }
+
+    pub async fn get_player_stats(&self) -> Result<Vec<PlayerStats>, Box<dyn Error>> {
+        let mut ret = Vec::new();
+        for file in std::fs::read_dir(self.data_path.join("world/stats"))? {
+            let filepath = file?.path();
+            if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
+                ret.push(PlayerStats::from_stats_file(&filepath)?);
+            }
+        }
+        Ok(ret)
     }
 }

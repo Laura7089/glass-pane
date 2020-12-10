@@ -35,7 +35,7 @@ async fn main() {
 
     for server in config.servers.iter() {
         println!(
-            "server name: {}, server stats: {:?}\nplayer stats: {:?}",
+            "\nserver name: {}\nserver stats: {:?}\nplayer stats: {:?}",
             &server.name,
             server.stats().await,
             server.get_player_stats().await,

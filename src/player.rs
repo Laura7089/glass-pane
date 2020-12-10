@@ -62,6 +62,7 @@ impl PlayerStatsFull {
 }
 
 impl PlayerStats {
+    // TODO: use tokio::fs
     pub async fn from_stats_files(
         stats_file: &Path,
         adv_file: &Path,

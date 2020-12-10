@@ -1,5 +1,6 @@
 use crate::player::PlayerStats;
-use log::{debug, error};
+use std::error::Error;
+use log::{debug, warn, error};
 use rcon::Connection;
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -17,99 +18,115 @@ pub struct MinecraftServer {
 
 #[derive(Debug)]
 pub struct ServerStats {
-    banlist_len: Option<u32>,
-    ip_banlist_len: Option<u32>,
-    whitelist_len: Option<u32>,
+    banlist_len: u32,
+    ip_banlist_len: u32,
+    whitelist_len: u32,
+    connected_players: u32,
 }
 
 impl MinecraftServer {
-    pub async fn stats(&self) -> ServerStats {
+    pub async fn stats(&self) -> Option<ServerStats> {
         debug!("Getting stats for server '{}'...", &self.name);
-        ServerStats {
-            banlist_len: self.banlist_len().await,
-            ip_banlist_len: self.ip_banlist_len().await,
-            whitelist_len: self.whitelist_len().await,
-        }
+        Some(ServerStats {
+            banlist_len: {
+                debug!("Querying '{}' server banlist with RCON...", &self.name);
+                match self.rcon_command("banlist players").await {
+                    Ok(raw) => {
+                        if &raw[..12] == "There are no" {
+                            0
+                        } else {
+                            raw.lines().count() as u32 - 1
+                        }
+                    },
+                    Err(e) => {
+                        error!("Couldn't get server '{}' banlist: {}", &self.name, e);
+                        return None;
+                    }
+                }
+            },
+            ip_banlist_len: {
+                debug!("Querying '{}' server banlist with RCON...", &self.name);
+                match self.rcon_command("banlist players").await {
+                    Ok(raw) => {
+                        if &raw[..12] == "There are no" {
+                            0
+                        } else {
+                            raw.lines().count() as u32 - 1
+                        }
+                    },
+                    Err(e) => {
+                        error!("Couldn't get server '{}' IP banlist: {}", &self.name, e);
+                        return None;
+                    },
+                }
+            },
+            whitelist_len: {
+                debug!("Querying '{}' server whitelist with RCON...", &self.name);
+                match self.rcon_command("whitelist list").await {
+                    Ok(raw) => {
+                        if &raw[..12] == "There are no" {
+                            0
+                        } else {
+                            let list_raw = raw.split(": ").nth(1).unwrap();
+                            list_raw.split(", ").count() as u32
+                        }
+                    },
+                    Err(e) => {
+                        error!("Couldn't get server '{}' whitelist: {}", &self.name, e);
+                        return None;
+                    },
+                }
+            },
+            connected_players: {
+                debug!("Querying '{}' server player list with RCON...", &self.name);
+                match self.rcon_command("list").await {
+                    Ok(raw) => raw.split(" ").nth(2).unwrap().parse().unwrap(),
+                    Err(e) => {
+                        error!("Couldn't get server '{}' connected players: {}", &self.name, e);
+                        return None;
+                    },
+                }
+            }
+        })
     }
 
     // TODO: rcon functionality behind feature gate?
     // TODO: try recreating connection if it's cached and command fails, before failing
-    async fn rcon_command(&self, cmd: &str) -> Option<String> {
+    async fn rcon_command(&self, cmd: &str) -> Result<String, Box<dyn Error>> {
         let mut rcon_opt = self.rcon_connection.borrow_mut();
         if rcon_opt.is_some() {
-            debug!("Open RCON connection found for server '{}'", &self.name);
+            debug!("Cached RCON connection found for server '{}'", &self.name);
         } else {
-            match Connection::builder()
+            let conn = Connection::builder()
                 .enable_minecraft_quirks(true)
                 .connect(&self.rcon_address, &self.rcon_password)
-                .await
-            {
-                Ok(c) => {
-                    debug!("Starting RCON connection for server '{}'", &self.name);
-                    rcon_opt.replace(c);
-                    ()
-                }
-                Err(e) => {
-                    error!(
-                        "FAILED starting RCON connection to server '{}': {}",
-                        self.name, e
-                    );
-                    return None;
-                }
-            }
+                .await?;
+            debug!("Starting RCON connection for server '{}'", &self.name);
+            rcon_opt.replace(conn);
         }
 
-        match &self
-            .rcon_connection
-            .borrow_mut()
+        match rcon_opt
             .as_mut()
             .unwrap()
             .cmd(cmd)
             .await
         {
-            Ok(r) => Some(r.clone()),
+            Ok(r) => Ok(r.clone()),
             Err(e) => {
-                error!(
-                    "FAILED running command '{}' on server '{}': {}",
+                warn!(
+                    "FAILED running command '{}' on server '{}': {}, retrying once...",
                     cmd, self.name, e
                 );
-                None
+                let conn = Connection::builder()
+                    .enable_minecraft_quirks(true)
+                    .connect(&self.rcon_address, &self.rcon_password)
+                    .await?;
+                debug!("Starting RCON connection for server '{}'", &self.name);
+                rcon_opt.replace(conn);
+
+                Ok(rcon_opt.as_mut().unwrap().cmd(cmd).await?)
             }
         }
-    }
-
-    async fn whitelist_len(&self) -> Option<u32> {
-        debug!("Querying '{}' server whitelist with RCON...", &self.name);
-        self.rcon_command("whitelist list").await.map(|raw| {
-            if &raw[..12] == "There are no" {
-                0
-            } else {
-                let list_raw = raw.split(": ").nth(1).unwrap();
-                list_raw.split(", ").count() as u32
-            }
-        })
-    }
-
-    async fn ip_banlist_len(&self) -> Option<u32> {
-        debug!("Querying '{}' server IP banlist with RCON...", &self.name);
-        self.rcon_command("banlist ips").await.map(|raw| {
-            if &raw[..12] == "There are no" {
-                0
-            } else {
-                raw.lines().count() as u32 - 1
-            }
-        })
-    }
-
-    async fn banlist_len(&self) -> Option<u32> {
-        debug!("Querying '{}' server banlist with RCON...", &self.name);
-        self.rcon_command("banlist players").await.map(|raw| {
-            if &raw[..12] == "There are no" {
-                0
-            } else {
-                raw.lines().count() as u32 - 1
-            }
-        })
     }
 
     pub async fn get_player_stats(&self) -> Vec<PlayerStats> {

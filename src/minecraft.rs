@@ -1,4 +1,5 @@
 use crate::player::{PlayerId, PlayerStats};
+use log::{debug, error};
 use rcon::Connection;
 use serde::Deserialize;
 use std::error::Error;
@@ -74,14 +75,46 @@ impl MinecraftServer {
         unimplemented!()
     }
 
-    pub async fn get_player_stats(&self) -> Result<Vec<PlayerStats>, Box<dyn Error>> {
+    pub async fn get_player_stats(&self) -> Vec<PlayerStats> {
         let mut ret = Vec::new();
-        for file in std::fs::read_dir(self.data_path.join("world/stats"))? {
-            let filepath = file?.path();
+        let stats_path = self.data_path.join("world/stats");
+        debug!(
+            "Getting player stats for server '{}' from '{}'...",
+            &self.name,
+            stats_path.to_str().unwrap()
+        );
+
+        let stats_dir = match std::fs::read_dir(&stats_path) {
+            Ok(d) => d,
+            Err(e) => {
+                error!(
+                    "Couldn't get stats from directory '{}', error: {}",
+                    stats_path.to_str().unwrap(),
+                    e
+                );
+                return ret;
+            }
+        };
+        for file in stats_dir {
+            let filepath = file.unwrap().path();
             if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
-                ret.push(PlayerStats::from_stats_file(&filepath)?);
+                let player_stats = match PlayerStats::from_stats_file(&filepath).await {
+                    Ok(p) => {
+                        debug!("Got stats for player {}", &p.id.username);
+                        p
+                    }
+                    Err(e) => {
+                        error!(
+                            "Couldn't read player stats file '{}', error: {}",
+                            &filepath.to_str().unwrap(),
+                            e
+                        );
+                        return ret;
+                    }
+                };
+                ret.push(player_stats);
             }
         }
-        Ok(ret)
+        ret
     }
 }

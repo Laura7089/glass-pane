@@ -7,12 +7,17 @@ edition = "2018"
 [dependencies]
 prometheus = "0.11.0"
 rcon = "0.3.1"
+log = "0.4.0"
 env_logger = "0.8.2"
 uuid = "0.8.1"
 serde_yaml = "0.8.14"
+serde_json = "1.0.60"
+reqwest = "0.10.9"
+lazy_static = "1.4.0"
 
 [dependencies.tokio]
-version = "0.3.5"
+# Use outdated version to avoid compatibility issues with reqwest
+version = "0.2.23"
 features = ["full"]
 
 [dependencies.serde]

@@ -77,7 +77,8 @@ impl MinecraftServer {
         for file in stats_dir {
             let filepath = file.unwrap().path();
             if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
-                let player_stats = match PlayerStats::from_stats_file(&filepath).await {
+                let adv_path = PathBuf::from("world/advancements").join(filepath.file_name().unwrap());
+                let player_stats = match PlayerStats::from_stats_files(&filepath, &adv_path).await {
                     Ok(p) => {
                         debug!("Got stats for player {}", &p.id.username);
                         p

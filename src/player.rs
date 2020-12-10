@@ -20,6 +20,7 @@ pub struct PlayerStats {
     pub items_crafted: u32,
     // TODO: mob types?
     pub mobs_killed: u32,
+    pub adv_made: u32,
 }
 
 #[derive(Debug, Default)]
@@ -50,11 +51,13 @@ struct PlayerStatsFull {
 }
 
 impl PlayerStats {
-    pub async fn from_stats_file(file: &Path) -> Result<Self, Box<dyn Error>> {
-        let file_raw = std::fs::read_to_string(file)?;
-        let wrapped: StatsWrapped = serde_yaml::from_str(&file_raw)?;
+    pub async fn from_stats_files(stats_file: &Path, adv_file: &Path) -> Result<Self, Box<dyn Error>> {
+        let file_raw = std::fs::read_to_string(stats_file)?;
+        let wrapped: StatsWrapped = serde_json::from_str(&file_raw)?;
         let stats_full: PlayerStatsFull = wrapped.stats;
-        let uuid = Uuid::parse_str(file.file_stem().unwrap().to_str().unwrap())?;
+        let uuid = Uuid::parse_str(stats_file.file_stem().unwrap().to_str().unwrap())?;
+
+        let adv_made = serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(adv_file)?)?.len() as u32;
 
         // TODO: resolve unwraps
         Ok(Self {
@@ -67,6 +70,7 @@ impl PlayerStats {
             items_used: stats_full.items_used.values().sum(),
             items_crafted: stats_full.items_crafted.values().sum(),
             mobs_killed: stats_full.mobs_killed.values().sum(),
+            adv_made,
         })
     }
 }

@@ -22,7 +22,6 @@ const DISTANCE_KEYS: [&'static str; 9] = [
     "minecraft:walk_under_water_one_cm",
 ];
 
-
 #[derive(Debug)]
 pub struct PlayerStats {
     pub username: String,
@@ -40,11 +39,6 @@ pub struct PlayerStats {
     pub damage_dealt: u32,
     pub adv_made: u32,
     pub cm_travelled: u32,
-}
-
-#[derive(Deserialize)]
-struct StatsWrapped {
-    stats: PlayerStatsFull,
 }
 
 #[derive(Deserialize, Debug)]
@@ -73,8 +67,9 @@ impl PlayerStats {
         adv_file: &Path,
     ) -> Result<Self, Box<dyn Error>> {
         let file_raw = std::fs::read_to_string(stats_file)?;
-        let wrapped: StatsWrapped = serde_json::from_str(&file_raw)?;
-        let stats_full: PlayerStatsFull = wrapped.stats;
+        let stats_wrapped: serde_json::Value = serde_json::from_str(&file_raw)?;
+        let stats_full: PlayerStatsFull =
+            serde_json::value::from_value(stats_wrapped.get("stats").unwrap().clone())?;
         let uuid = Uuid::parse_str(stats_file.file_stem().unwrap().to_str().unwrap())?;
 
         let adv_made = std::fs::read_to_string(adv_file)?

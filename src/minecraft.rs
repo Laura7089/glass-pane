@@ -2,36 +2,56 @@ use crate::player::PlayerStats;
 use log::{debug, error};
 use rcon::Connection;
 use serde::Deserialize;
+use std::cell::RefCell;
 use std::path::PathBuf;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct MinecraftServer {
     pub name: String,
     rcon_address: String,
     rcon_password: String,
     data_path: PathBuf,
+    #[serde(skip)]
+    rcon_connection: RefCell<Option<Connection>>,
 }
 
 impl MinecraftServer {
     // TODO: rcon functionality behind feature gate?
-    // TODO: cache connections?
+    // TODO: try recreating connection if it's cached and command fails, before failing
     async fn rcon_command(&self, cmd: &str) -> Option<String> {
-        let mut conn = match Connection::builder()
-            .enable_minecraft_quirks(true)
-            .connect(&self.rcon_address, &self.rcon_password)
+        let mut rcon_opt = self.rcon_connection.borrow_mut();
+        if rcon_opt.is_some() {
+            debug!("Open RCON connection found for server '{}'", &self.name);
+        } else {
+            match Connection::builder()
+                .enable_minecraft_quirks(true)
+                .connect(&self.rcon_address, &self.rcon_password)
+                .await
+            {
+                Ok(c) => {
+                    debug!("Starting RCON connection for server '{}'", &self.name);
+                    rcon_opt.replace(c);
+                    ()
+                }
+                Err(e) => {
+                    error!(
+                        "FAILED starting RCON connection to server '{}': {}",
+                        self.name, e
+                    );
+                    return None;
+                }
+            }
+        }
+
+        match &self
+            .rcon_connection
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .cmd(cmd)
             .await
         {
-            Ok(c) => c,
-            Err(e) => {
-                error!(
-                    "FAILED starting RCON connection to server '{}': {}",
-                    self.name, e
-                );
-                return None;
-            }
-        };
-        match conn.cmd(cmd).await {
-            Ok(r) => Some(r),
+            Ok(r) => Some(r.clone()),
             Err(e) => {
                 error!(
                     "FAILED running command '{}' on server '{}': {}",

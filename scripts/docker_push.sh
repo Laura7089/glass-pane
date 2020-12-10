@@ -1,9 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
-image_name="$1"
-username="$2"
-password="$3"
+image_name="$DOCKER_IMAGE"
+username="$DOCKER_USERNAME"
+password="$DOCKER_PASSWORD"
 
 echo "$password" | docker login -u "$username"
 

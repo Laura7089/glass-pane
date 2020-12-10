@@ -4,3 +4,5 @@ README.md
 LICENSE
 Dockerfile
 .dockerignore
+scripts
+.travis.yml

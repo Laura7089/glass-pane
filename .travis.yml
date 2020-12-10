@@ -10,7 +10,7 @@ services:
 
 script:
   - cargo test --verbose
-  - docker build -t $DOCKER_IMAGE .
+  - bash scripts/docker_build.sh
 
 deploy:
   provider: script

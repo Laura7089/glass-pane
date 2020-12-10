@@ -1,6 +1,4 @@
 #[macro_use]
-extern crate env_logger;
-#[macro_use]
 extern crate lazy_static;
 
 use log::{debug, info};
@@ -37,11 +35,9 @@ async fn main() {
 
     for server in config.servers.iter() {
         println!(
-            "server: {}, whitelist length: {:?}, banlist length: {:?}, ip banlist length: {:?}\nstats: {:?}",
+            "server name: {}, server stats: {:?}\nplayer stats: {:?}",
             &server.name,
-            server.whitelist_len().await,
-            server.banlist_len().await,
-            server.ip_banlist_len().await,
+            server.stats().await,
             server.get_player_stats().await,
         );
     }

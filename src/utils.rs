@@ -46,7 +46,7 @@ pub async fn username_from_uuid(uuid: &Uuid) -> Result<String, Box<dyn Error>> {
     }
 }
 
-pub async fn uuid_from_username(username: &str) -> Result<Uuid, Box<dyn Error>> {
+pub async fn _uuid_from_username(username: &str) -> Result<Uuid, Box<dyn Error>> {
     let mut uuid_cache = UUID_CACHE.lock().unwrap();
     if let Some(uuid) = uuid_cache.get(username) {
         debug!("UUID for name '{}' found in cache: {}", username, &uuid);

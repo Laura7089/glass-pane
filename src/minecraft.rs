@@ -15,7 +15,23 @@ pub struct MinecraftServer {
     rcon_connection: RefCell<Option<Connection>>,
 }
 
+#[derive(Debug)]
+pub struct ServerStats {
+    banlist_len: Option<u32>,
+    ip_banlist_len: Option<u32>,
+    whitelist_len: Option<u32>,
+}
+
 impl MinecraftServer {
+    pub async fn stats(&self) -> ServerStats {
+        debug!("Getting stats for server '{}'...", &self.name);
+        ServerStats {
+            banlist_len: self.banlist_len().await,
+            ip_banlist_len: self.ip_banlist_len().await,
+            whitelist_len: self.whitelist_len().await,
+        }
+    }
+
     // TODO: rcon functionality behind feature gate?
     // TODO: try recreating connection if it's cached and command fails, before failing
     async fn rcon_command(&self, cmd: &str) -> Option<String> {
@@ -62,7 +78,7 @@ impl MinecraftServer {
         }
     }
 
-    pub async fn whitelist_len(&self) -> Option<u32> {
+    async fn whitelist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server whitelist with RCON...", &self.name);
         self.rcon_command("whitelist list").await.map(|raw| {
             if &raw[..12] == "There are no" {
@@ -74,26 +90,24 @@ impl MinecraftServer {
         })
     }
 
-    pub async fn ip_banlist_len(&self) -> Option<u32> {
+    async fn ip_banlist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server IP banlist with RCON...", &self.name);
         self.rcon_command("banlist ips").await.map(|raw| {
             if &raw[..12] == "There are no" {
                 0
             } else {
-                let list_raw = raw.split(": ").nth(1).unwrap();
-                list_raw.split(", ").count() as u32
+                raw.lines().count() as u32 - 1
             }
         })
     }
 
-    pub async fn banlist_len(&self) -> Option<u32> {
+    async fn banlist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server banlist with RCON...", &self.name);
         self.rcon_command("banlist players").await.map(|raw| {
             if &raw[..12] == "There are no" {
                 0
             } else {
-                let list_raw = raw.split(": ").nth(1).unwrap();
-                list_raw.split(", ").count() as u32
+                raw.lines().count() as u32 - 1
             }
         })
     }

@@ -3,7 +3,7 @@ extern crate env_logger;
 #[macro_use]
 extern crate lazy_static;
 
-use log::{debug, error, info};
+use log::{debug, info};
 
 mod config;
 mod minecraft;
@@ -37,11 +37,11 @@ async fn main() {
 
     for server in config.servers.iter() {
         println!(
-            "server: {}, whitelist length: {}, banlist length: {}, ip banlist length: {}\nstats: {:?}",
+            "server: {}, whitelist length: {:?}, banlist length: {:?}, ip banlist length: {:?}\nstats: {:?}",
             &server.name,
-            server.whitelist_len().await.unwrap(),
-            server.banlist_len().await.unwrap(),
-            server.ip_banlist_len().await.unwrap(),
+            server.whitelist_len().await,
+            server.banlist_len().await,
+            server.ip_banlist_len().await,
             server.get_player_stats().await,
         );
     }

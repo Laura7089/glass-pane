@@ -2,7 +2,6 @@ use crate::player::PlayerStats;
 use log::{debug, error};
 use rcon::Connection;
 use serde::Deserialize;
-use std::error::Error;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]
@@ -103,11 +102,10 @@ impl MinecraftServer {
             let filepath = file.unwrap().path();
             if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
                 let uuid = filepath.file_name().unwrap();
-                let adv_path =
-                    PathBuf::from("world/advancements").join(uuid);
+                let adv_path = self.data_path.join("world/advancements").join(uuid);
                 let player_stats = match PlayerStats::from_stats_files(&filepath, &adv_path).await {
                     Ok(p) => {
-                        debug!("Got stats/advancements for player {}", &p.id.username);
+                        debug!("Got stats/advancements for player {}", &p.username);
                         p
                     }
                     Err(e) => {

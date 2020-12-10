@@ -13,7 +13,8 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct PlayerStats {
-    pub id: PlayerId,
+    pub username: String,
+    pub uuid: Uuid,
     pub blocks_mined: u32,
     pub items_picked_up: u32,
     pub items_used: u32,
@@ -23,15 +24,14 @@ pub struct PlayerStats {
     pub adv_made: u32,
 }
 
-#[derive(Debug, Default)]
-pub struct PlayerId {
-    pub username: String,
-    pub uuid: Uuid,
-}
-
 #[derive(Deserialize)]
 struct StatsWrapped {
     stats: PlayerStatsFull,
+}
+
+#[derive(Deserialize)]
+struct PlayerAdvancement {
+    done: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -60,16 +60,15 @@ impl PlayerStats {
         let stats_full: PlayerStatsFull = wrapped.stats;
         let uuid = Uuid::parse_str(stats_file.file_stem().unwrap().to_str().unwrap())?;
 
-        let adv_made =
-            serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(adv_file)?)?
-                .len() as u32;
+        let adv_made = std::fs::read_to_string(adv_file)?
+            .lines()
+            .filter(|l| l.contains("\"done\": true"))
+            .count() as u32;
 
         // TODO: resolve unwraps
         Ok(Self {
-            id: PlayerId {
-                username: crate::utils::username_from_uuid(&uuid).await?,
-                uuid,
-            },
+            username: crate::utils::username_from_uuid(&uuid).await?,
+            uuid,
             blocks_mined: stats_full.blocks_mined.values().sum(),
             items_picked_up: stats_full.items_picked_up.values().sum(),
             items_used: stats_full.items_used.values().sum(),

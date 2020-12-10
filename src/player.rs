@@ -1,4 +1,3 @@
-use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
@@ -11,6 +10,19 @@ lazy_static! {
     static ref USERNAME_CACHE: Mutex<HashMap<Uuid, String>> = Mutex::new(HashMap::new());
 }
 
+const DISTANCE_KEYS: [&'static str; 9] = [
+    "minecraft:climb_one_cm",
+    "minecraft:crouch_one_cm",
+    "minecraft:fall_one_cm",
+    "minecraft:fly_one_cm",
+    "minecraft:sprint_one_cm",
+    "minecraft:swim_one_cm",
+    "minecraft:walk_one_cm",
+    "minecraft:walk_on_water_one_cm",
+    "minecraft:walk_under_water_one_cm",
+];
+
+
 #[derive(Debug)]
 pub struct PlayerStats {
     pub username: String,
@@ -21,7 +33,13 @@ pub struct PlayerStats {
     pub items_crafted: u32,
     // TODO: mob types?
     pub mobs_killed: u32,
+    pub deaths: u32,
+    pub jumps: u32,
+    pub minutes_played: u32,
+    pub damage_taken: u32,
+    pub damage_dealt: u32,
     pub adv_made: u32,
+    pub cm_travelled: u32,
 }
 
 #[derive(Deserialize)]
@@ -29,25 +47,24 @@ struct StatsWrapped {
     stats: PlayerStatsFull,
 }
 
-#[derive(Deserialize)]
-struct PlayerAdvancement {
-    done: bool,
-}
-
 #[derive(Deserialize, Debug)]
 struct PlayerStatsFull {
     #[serde(default, rename = "minecraft:mined")]
-    pub blocks_mined: HashMap<String, u32>,
+    blocks_mined: HashMap<String, u32>,
     #[serde(default, rename = "minecraft:picked_up")]
-    pub items_picked_up: HashMap<String, u32>,
+    items_picked_up: HashMap<String, u32>,
     #[serde(default, rename = "minecraft:used")]
-    pub items_used: HashMap<String, u32>,
+    items_used: HashMap<String, u32>,
     #[serde(default, rename = "minecraft:crafted")]
-    pub items_crafted: HashMap<String, u32>,
-    #[serde(default, rename = "minecraft:killed")]
-    pub mobs_killed: HashMap<String, u32>,
+    items_crafted: HashMap<String, u32>,
     #[serde(default, rename = "minecraft:custom")]
-    pub misc_stats: HashMap<String, u32>,
+    misc_stats: HashMap<String, u32>,
+}
+
+impl PlayerStatsFull {
+    fn get_misc(&self, key: &str) -> u32 {
+        *self.misc_stats.get(key).unwrap_or(&0)
+    }
 }
 
 impl PlayerStats {
@@ -73,7 +90,13 @@ impl PlayerStats {
             items_picked_up: stats_full.items_picked_up.values().sum(),
             items_used: stats_full.items_used.values().sum(),
             items_crafted: stats_full.items_crafted.values().sum(),
-            mobs_killed: stats_full.mobs_killed.values().sum(),
+            mobs_killed: stats_full.get_misc("minecraft:mob_kills"),
+            damage_dealt: stats_full.get_misc("minecraft:damage_dealt"),
+            damage_taken: stats_full.get_misc("minecraft:damage_taken"),
+            deaths: stats_full.get_misc("minecraft:deaths"),
+            minutes_played: stats_full.get_misc("minecraft:play_one_minute"),
+            jumps: stats_full.get_misc("minecraft:jump"),
+            cm_travelled: DISTANCE_KEYS.iter().map(|k| stats_full.get_misc(k)).sum(),
             adv_made,
         })
     }

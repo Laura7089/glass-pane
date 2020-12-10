@@ -1,6 +1,5 @@
 #!/bin/bash
 set -eo pipefail
 
-echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME"
-
+docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 docker push "$DOCKER_IMAGE"

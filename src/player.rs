@@ -51,13 +51,18 @@ struct PlayerStatsFull {
 }
 
 impl PlayerStats {
-    pub async fn from_stats_files(stats_file: &Path, adv_file: &Path) -> Result<Self, Box<dyn Error>> {
+    pub async fn from_stats_files(
+        stats_file: &Path,
+        adv_file: &Path,
+    ) -> Result<Self, Box<dyn Error>> {
         let file_raw = std::fs::read_to_string(stats_file)?;
         let wrapped: StatsWrapped = serde_json::from_str(&file_raw)?;
         let stats_full: PlayerStatsFull = wrapped.stats;
         let uuid = Uuid::parse_str(stats_file.file_stem().unwrap().to_str().unwrap())?;
 
-        let adv_made = serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(adv_file)?)?.len() as u32;
+        let adv_made =
+            serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(adv_file)?)?
+                .len() as u32;
 
         // TODO: resolve unwraps
         Ok(Self {

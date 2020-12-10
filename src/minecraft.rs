@@ -15,43 +15,68 @@ pub struct MinecraftServer {
 
 impl MinecraftServer {
     // TODO: rcon functionality behind feature gate?
-    async fn get_connection(&self) -> Result<Connection, Box<dyn Error>> {
-        Ok(Connection::builder()
+    // TODO: cache connections?
+    async fn rcon_command(&self, cmd: &str) -> Option<String> {
+        let mut conn = match Connection::builder()
             .enable_minecraft_quirks(true)
             .connect(&self.rcon_address, &self.rcon_password)
-            .await?)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                error!(
+                    "FAILED starting RCON connection to server '{}': {}",
+                    self.name, e
+                );
+                return None;
+            }
+        };
+        match conn.cmd(cmd).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                error!(
+                    "FAILED running command '{}' on server '{}': {}",
+                    cmd, self.name, e
+                );
+                None
+            }
+        }
     }
 
-    pub async fn whitelist_len(&self) -> Result<u32, Box<dyn Error>> {
+    pub async fn whitelist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server whitelist with RCON...", &self.name);
-        // TODO: cache connections?
-        let server_response = self.get_connection().await?.cmd("whitelist list").await?;
-        if &server_response[..12] == "There are no" {
-            Ok(0)
-        } else {
-            let list_raw = server_response.split(": ").nth(1).unwrap();
-            Ok(list_raw.split(", ").count() as u32)
-        }
+        self.rcon_command("whitelist list").await.map(|raw| {
+            if &raw[..12] == "There are no" {
+                0
+            } else {
+                let list_raw = raw.split(": ").nth(1).unwrap();
+                list_raw.split(", ").count() as u32
+            }
+        })
     }
 
-    pub async fn ip_banlist_len(&self) -> Result<u32, Box<dyn Error>> {
+    pub async fn ip_banlist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server IP banlist with RCON...", &self.name);
-        let server_response = self.get_connection().await?.cmd("banlist ips").await?;
-        if &server_response[..12] == "There are no" {
-            Ok(0)
-        } else {
-            Ok(server_response.lines().count() as u32 - 1)
-        }
+        self.rcon_command("banlist ips").await.map(|raw| {
+            if &raw[..12] == "There are no" {
+                0
+            } else {
+                let list_raw = raw.split(": ").nth(1).unwrap();
+                list_raw.split(", ").count() as u32
+            }
+        })
     }
 
-    pub async fn banlist_len(&self) -> Result<u32, Box<dyn Error>> {
+    pub async fn banlist_len(&self) -> Option<u32> {
         debug!("Querying '{}' server banlist with RCON...", &self.name);
-        let server_response = self.get_connection().await?.cmd("banlist players").await?;
-        if &server_response[..12] == "There are no" {
-            Ok(0)
-        } else {
-            Ok(server_response.lines().count() as u32 - 1)
-        }
+        self.rcon_command("banlist players").await.map(|raw| {
+            if &raw[..12] == "There are no" {
+                0
+            } else {
+                let list_raw = raw.split(": ").nth(1).unwrap();
+                list_raw.split(", ").count() as u32
+            }
+        })
     }
 
     pub async fn get_player_stats(&self) -> Vec<PlayerStats> {
@@ -77,16 +102,18 @@ impl MinecraftServer {
         for file in stats_dir {
             let filepath = file.unwrap().path();
             if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
-                let adv_path = PathBuf::from("world/advancements").join(filepath.file_name().unwrap());
+                let uuid = filepath.file_name().unwrap();
+                let adv_path =
+                    PathBuf::from("world/advancements").join(uuid);
                 let player_stats = match PlayerStats::from_stats_files(&filepath, &adv_path).await {
                     Ok(p) => {
-                        debug!("Got stats for player {}", &p.id.username);
+                        debug!("Got stats/advancements for player {}", &p.id.username);
                         p
                     }
                     Err(e) => {
                         error!(
-                            "Couldn't read player stats file '{}', error: {}",
-                            &filepath.to_str().unwrap(),
+                            "Couldn't read player stats/advancements for '{}', error: {}",
+                            uuid.to_str().unwrap(),
                             e
                         );
                         continue;

@@ -1,12 +1,18 @@
 use log::debug;
 use serde::Deserialize;
-use std::{collections::HashMap, error::Error, sync::{RwLock, Arc}};
+use std::{
+    collections::HashMap,
+    error::Error,
+    sync::{Arc, RwLock},
+};
 use uuid::Uuid;
 
 // TODO: do I need an Arc?
 lazy_static! {
-    static ref USERNAME_CACHE: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
-    static ref UUID_CACHE: Arc<RwLock<HashMap<String, Uuid>>> = Arc::new(RwLock::new(HashMap::new()));
+    static ref USERNAME_CACHE: Arc<RwLock<HashMap<String, String>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+    static ref UUID_CACHE: Arc<RwLock<HashMap<String, Uuid>>> =
+        Arc::new(RwLock::new(HashMap::new()));
 }
 
 #[derive(Deserialize)]
@@ -19,7 +25,12 @@ struct MojangPlayerName {
 pub async fn username_from_uuid(uuid: &Uuid) -> Result<String, Box<dyn Error>> {
     let uuid = format!("{}", uuid.to_simple());
     // TODO: is unwrap okay here?
-    let name_opt = USERNAME_CACHE.clone().read().unwrap().get(&uuid).map(|n| n.clone());
+    let name_opt = USERNAME_CACHE
+        .clone()
+        .read()
+        .unwrap()
+        .get(&uuid)
+        .map(|n| n.clone());
     if let Some(name) = name_opt {
         debug!("Name for UUID {} found in cache: {}", &uuid, &name);
         Ok(name)
@@ -41,7 +52,11 @@ pub async fn username_from_uuid(uuid: &Uuid) -> Result<String, Box<dyn Error>> {
         .name;
         // TODO: unwraps
         debug!("Name for UUID {} found with API: {}", &uuid, &name);
-        USERNAME_CACHE.clone().write().unwrap().insert(uuid, name.clone());
+        USERNAME_CACHE
+            .clone()
+            .write()
+            .unwrap()
+            .insert(uuid, name.clone());
         Ok(name)
     }
 }

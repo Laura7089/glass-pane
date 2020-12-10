@@ -1,9 +1,9 @@
 use crate::player::PlayerStats;
-use std::error::Error;
-use log::{debug, warn, error};
+use log::{debug, error, warn};
 use rcon::Connection;
 use serde::Deserialize;
 use std::cell::RefCell;
+use std::error::Error;
 use std::path::PathBuf;
 
 #[derive(Deserialize)]
@@ -27,66 +27,69 @@ pub struct ServerStats {
 impl MinecraftServer {
     pub async fn stats(&self) -> Option<ServerStats> {
         debug!("Getting stats for server '{}'...", &self.name);
-        Some(ServerStats {
-            banlist_len: {
-                debug!("Querying '{}' server banlist with RCON...", &self.name);
-                match self.rcon_command("banlist players").await {
-                    Ok(raw) => {
-                        if &raw[..12] == "There are no" {
-                            0
-                        } else {
-                            raw.lines().count() as u32 - 1
-                        }
-                    },
-                    Err(e) => {
-                        error!("Couldn't get server '{}' banlist: {}", &self.name, e);
-                        return None;
-                    }
-                }
-            },
-            ip_banlist_len: {
-                debug!("Querying '{}' server banlist with RCON...", &self.name);
-                match self.rcon_command("banlist players").await {
-                    Ok(raw) => {
-                        if &raw[..12] == "There are no" {
-                            0
-                        } else {
-                            raw.lines().count() as u32 - 1
-                        }
-                    },
-                    Err(e) => {
-                        error!("Couldn't get server '{}' IP banlist: {}", &self.name, e);
-                        return None;
-                    },
-                }
-            },
-            whitelist_len: {
-                debug!("Querying '{}' server whitelist with RCON...", &self.name);
-                match self.rcon_command("whitelist list").await {
-                    Ok(raw) => {
-                        if &raw[..12] == "There are no" {
-                            0
-                        } else {
-                            let list_raw = raw.split(": ").nth(1).unwrap();
-                            list_raw.split(", ").count() as u32
-                        }
-                    },
-                    Err(e) => {
-                        error!("Couldn't get server '{}' whitelist: {}", &self.name, e);
-                        return None;
-                    },
-                }
-            },
-            connected_players: {
-                debug!("Querying '{}' server player list with RCON...", &self.name);
-                match self.rcon_command("list").await {
-                    Ok(raw) => raw.split(" ").nth(2).unwrap().parse().unwrap(),
-                    Err(e) => {
-                        error!("Couldn't get server '{}' connected players: {}", &self.name, e);
-                        return None;
-                    },
+
+        debug!("Querying '{}' server banlist with RCON...", &self.name);
+        let banlist_len = match self.rcon_command("banlist players").await {
+            Ok(raw) => {
+                if &raw[..12] == "There are no" {
+                    0
+                } else {
+                    raw.lines().count() as u32 - 1
                 }
             }
+            Err(e) => {
+                error!("Couldn't get server '{}' banlist: {}", &self.name, e);
+                return None;
+            }
+        };
+
+        debug!("Querying '{}' server IP banlist with RCON...", &self.name);
+        let ip_banlist_len = match self.rcon_command("banlist ips").await {
+            Ok(raw) => {
+                if &raw[..12] == "There are no" {
+                    0
+                } else {
+                    raw.lines().count() as u32 - 1
+                }
+            }
+            Err(e) => {
+                error!("Couldn't get server '{}' IP banlist: {}", &self.name, e);
+                return None;
+            }
+        };
+
+        debug!("Querying '{}' server whitelist with RCON...", &self.name);
+        let whitelist_len = match self.rcon_command("whitelist list").await {
+            Ok(raw) => {
+                if &raw[..12] == "There are no" {
+                    0
+                } else {
+                    raw.split(": ").nth(1).unwrap().split(", ").count() as u32
+                }
+            }
+            Err(e) => {
+                error!("Couldn't get server '{}' whitelist: {}", &self.name, e);
+                return None;
+            }
+        };
+
+        debug!("Querying '{}' server player list with RCON...", &self.name);
+        let connected_players = match self.rcon_command("list").await {
+            Ok(raw) => raw.split(" ").nth(2).unwrap().parse().unwrap(),
+            Err(e) => {
+                error!(
+                    "Couldn't get server '{}' connected players: {}",
+                    &self.name, e
+                );
+                return None;
+            }
+        };
+
+        Some(ServerStats {
+            banlist_len,
+            ip_banlist_len,
+            whitelist_len,
+            connected_players,
         })
     }
 
@@ -105,12 +108,7 @@ impl MinecraftServer {
             rcon_opt.replace(conn);
         }
 
-        match rcon_opt
-            .as_mut()
-            .unwrap()
-            .cmd(cmd)
-            .await
-        {
+        match rcon_opt.as_mut().unwrap().cmd(cmd).await {
             Ok(r) => Ok(r.clone()),
             Err(e) => {
                 warn!(
@@ -151,25 +149,28 @@ impl MinecraftServer {
         };
         for file in stats_dir {
             let filepath = file.unwrap().path();
-            if filepath.extension() == Some(std::ffi::OsStr::new("json")) {
-                let uuid = filepath.file_name().unwrap();
-                let adv_path = self.data_path.join("world/advancements").join(uuid);
-                let player_stats = match PlayerStats::from_stats_files(&filepath, &adv_path).await {
-                    Ok(p) => {
-                        debug!("Got stats/advancements for player {}", &p.username);
-                        p
-                    }
-                    Err(e) => {
-                        error!(
-                            "Couldn't read player stats/advancements for '{}', error: {}",
-                            uuid.to_str().unwrap(),
-                            e
-                        );
-                        continue;
-                    }
-                };
-                ret.push(player_stats);
+            // Skip non-JSON
+            if filepath.extension() != Some(std::ffi::OsStr::new("json")) {
+                continue;
             }
+
+            let uuid = filepath.file_name().unwrap();
+            let adv_path = self.data_path.join("world/advancements").join(uuid);
+            let player_stats = match PlayerStats::from_stats_files(&filepath, &adv_path).await {
+                Ok(p) => {
+                    debug!("Got stats/advancements for player {}", &p.username);
+                    p
+                }
+                Err(e) => {
+                    error!(
+                        "Couldn't read player stats/advancements for '{}', error: {}",
+                        uuid.to_str().unwrap(),
+                        e
+                    );
+                    continue;
+                }
+            };
+            ret.push(player_stats);
         }
         ret
     }

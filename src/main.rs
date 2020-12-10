@@ -1,17 +1,14 @@
 #[macro_use]
-
 extern crate env_logger;
 #[macro_use]
 extern crate lazy_static;
 
-use std::collections::HashMap;
 use log::{debug, error, info};
 
 mod config;
 mod minecraft;
 mod player;
-
-use player::PlayerId;
+mod utils;
 
 #[tokio::main]
 async fn main() {
@@ -39,8 +36,13 @@ async fn main() {
     );
 
     for server in config.servers.iter() {
-        println!("server: {}, stats: {:?}", &server.name, server.get_player_stats().await);
+        println!(
+            "server: {}, whitelist length: {}, banlist length: {}, ip banlist length: {}\nstats: {:?}",
+            &server.name,
+            server.whitelist_len().await.unwrap(),
+            server.banlist_len().await.unwrap(),
+            server.ip_banlist_len().await.unwrap(),
+            server.get_player_stats().await,
+        );
     }
-    println!("{:?}", &config.servers);
-
 }

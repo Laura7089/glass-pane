@@ -4,9 +4,9 @@ extern crate lazy_static;
 use log::{debug, info};
 
 mod config;
-mod minecraft;
 mod player;
 mod utils;
+mod minecraft;
 
 #[tokio::main]
 async fn main() {
@@ -34,11 +34,22 @@ async fn main() {
     );
 
     for server in config.servers.iter() {
-        println!(
-            "\nserver name: {}\nserver stats: {:?}\nplayer stats: {:?}",
-            &server.name,
-            server.stats().await,
-            server.get_player_stats().await,
-        );
+        #[cfg(feature = "commands")]
+        {
+            println!(
+                "\nserver name: {}\nserver stats: {:?}\nplayer stats: {:?}",
+                &server.name,
+                server.stats().await,
+                server.get_player_stats().await,
+            );
+        }
+        #[cfg(not(feature = "commands"))]
+        {
+            println!(
+                "\nserver name: {}\nplayer stats: {:?}",
+                &server.name,
+                server.get_player_stats().await,
+            );
+        }
     }
 }

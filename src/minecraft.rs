@@ -1,21 +1,30 @@
 use crate::player::PlayerStats;
-use log::{debug, error, warn};
-use rcon::Connection;
+use log::{debug, error};
 use serde::Deserialize;
-use std::cell::RefCell;
-use std::error::Error;
 use std::path::PathBuf;
+
+#[cfg(feature = "commands")]
+use {
+    rcon::Connection,
+    std::cell::RefCell,
+    std::error::Error,
+    log::warn,
+};
 
 #[derive(Deserialize)]
 pub struct MinecraftServer {
     pub name: String,
-    rcon_address: String,
-    rcon_password: String,
     data_path: PathBuf,
+    #[cfg(feature = "commands")]
+    rcon_address: String,
+    #[cfg(feature = "commands")]
+    rcon_password: String,
+    #[cfg(feature = "commands")]
     #[serde(skip)]
     rcon_connection: RefCell<Option<Connection>>,
 }
 
+#[cfg(feature = "commands")]
 #[derive(Debug)]
 pub struct ServerStats {
     banlist_len: u32,
@@ -25,6 +34,7 @@ pub struct ServerStats {
 }
 
 impl MinecraftServer {
+    #[cfg(feature = "commands")]
     pub async fn stats(&self) -> Option<ServerStats> {
         debug!("Getting stats for server '{}'...", &self.name);
 
@@ -95,6 +105,7 @@ impl MinecraftServer {
 
     // TODO: rcon functionality behind feature gate?
     // TODO: try recreating connection if it's cached and command fails, before failing
+    #[cfg(feature = "commands")]
     async fn rcon_command(&self, cmd: &str) -> Result<String, Box<dyn Error>> {
         let mut rcon_opt = self.rcon_connection.borrow_mut();
         if rcon_opt.is_some() {

@@ -1,5 +1,7 @@
 FROM rust:slim-buster AS builder
 
+ARG CARGO_FLAGS="--features=commands"
+
 COPY . /app
 WORKDIR /app
 
